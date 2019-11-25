@@ -2,8 +2,13 @@ import conf.KafkaConfigure;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.producer.Callback;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.junit.Test;
 import org.springframework.kafka.core.ConsumerFactory;
+import org.springframework.kafka.core.ProducerFactory;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -28,7 +33,7 @@ public class KafkaTest {
      */
     @Test
     public void test() {
-        String topic = "FrmsDSQueue";
+        String topic = "testA";
         KafkaConfigure kafkaConfigure = new KafkaConfigure();
         ConsumerFactory<String, String> consumerFactory =
                 kafkaConfigure.defaultKafkaConsumerFactory(new Properties());
@@ -52,6 +57,51 @@ public class KafkaTest {
             e.printStackTrace();
         } finally {
             consumer.close();
+        }
+    }
+
+    /**
+     * @Description 测试类-kafka生产者
+     * @Author SpiderMao
+     * @CreateDate 2019/11/25 14:13
+     */
+    @Test
+    public void test1() {
+        String topic = "testA";
+        KafkaConfigure kafkaConfigure = new KafkaConfigure();
+        ProducerFactory<String, String> producerFactory =
+                kafkaConfigure.defaultKafkaProducerFactory(new Properties());
+        Producer<String, String> producer = producerFactory.createProducer();
+
+        String time = String.valueOf(System.currentTimeMillis());
+
+        ProducerRecord<String, String> record
+                = new ProducerRecord<>(topic, time, time);
+
+        /*try {
+            // 无回调发送消息
+            //producer.send(record);
+            // 同步发送消息
+            //producer.send(record).get();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }*/
+        while (true) {
+            // 异步发送
+            producer.send(record, new DemoProducerCallback());
+        }
+    }
+
+    private class DemoProducerCallback implements Callback {
+
+        @Override
+        public void onCompletion(RecordMetadata metadata, Exception exception) {
+            if (exception != null) {
+                exception.printStackTrace();
+            } else {
+                System.out.println("offset" + metadata.offset() + "timestamp"
+                        + metadata.timestamp() + "topicPartition" + metadata.partition());
+            }
         }
     }
 }

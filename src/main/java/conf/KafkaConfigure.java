@@ -8,6 +8,7 @@ import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
 import org.springframework.kafka.core.ProducerFactory;
+import pojo.User;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -50,6 +51,9 @@ public class KafkaConfigure {
     // eventHandler定期的刷新metadata的间隔,-1只有在发送失败时才会重新刷新
     private String metadataRefresh = "-1";
 
+    // 对于临时性错误，生产者可以重发消息的次数
+    // 默认情况下生产者会在每次重试之间等待100ms
+    // 不过可以通过retry.backoff.ms参数来改变这个时间间隔
     private String retries = "0";
 
     //强制元数据时间间隔
@@ -59,6 +63,7 @@ public class KafkaConfigure {
 
     /**
      * 压缩方式
+     * 该参数可以设置为snappy、gzip、lz4等
      */
     private String compressionType;
     //=================end producer================================\\
@@ -121,8 +126,54 @@ public class KafkaConfigure {
         return new DefaultKafkaConsumerFactory<>(propsMap);
     }
 
+    public ConsumerFactory<Integer, User> customKafkaConsumerFactory(Properties consumerProperties) {
+        Map<String, Object> propsMap = new HashMap<String, Object>();
+        propsMap.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG,
+                this.brokerAddress);
+        propsMap.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, autoCommitFlag);
+        propsMap.put(ConsumerConfig.AUTO_COMMIT_INTERVAL_MS_CONFIG,
+                autoCommitInterval);
+        propsMap.put(ConsumerConfig.SESSION_TIMEOUT_MS_CONFIG, sessionTimeout);
+        propsMap.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
+                StringDeserializer.class);
+        propsMap.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
+                StringDeserializer.class);
+        propsMap.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        propsMap.put(ConsumerConfig.FETCH_MAX_BYTES_CONFIG, fetch_max_bytes);
+        propsMap.put(ConsumerConfig.FETCH_MAX_WAIT_MS_CONFIG,
+                fetch_max_wait_ms);
+        propsMap.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, offsetReset);
+        propsMap.put(ConsumerConfig.MAX_POLL_INTERVAL_MS_CONFIG, max_poll_interval_ms);
+        resetProperties(consumerProperties, propsMap);
+        if (propsMap.containsKey("security.krb5.conf"))
+            System.setProperty("java.security.krb5.conf", String.valueOf(propsMap.get("security.krb5.conf")));
+        if (propsMap.containsKey("security.login.conf"))
+            System.setProperty("java.security.auth.login.config", String.valueOf(propsMap.get("security.login.conf")));
+        return new DefaultKafkaConsumerFactory<>(propsMap);
+    }
 
     public ProducerFactory<String, String> defaultKafkaProducerFactory(Properties producerProperties) {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerAddress);
+        props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, maxBlockMS);
+        props.put(ProducerConfig.ACKS_CONFIG, acks);
+        props.put(ProducerConfig.RETRIES_CONFIG, retries);
+        props.put(ProducerConfig.BATCH_SIZE_CONFIG, batchSize);
+        props.put(ProducerConfig.LINGER_MS_CONFIG, 1);
+        props.put(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, maxRequestSize);
+        props.put(ProducerConfig.BUFFER_MEMORY_CONFIG, bufferMemory);
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        props.put(ProducerConfig.METADATA_MAX_AGE_CONFIG, metadataMaxAge);
+        //压缩配置
+        if (compressionType != null && !"".equals(compressionType)) {
+            props.put(ProducerConfig.COMPRESSION_TYPE_CONFIG, compressionType);
+        }
+        resetProperties(producerProperties, props);
+        return new DefaultKafkaProducerFactory<>(props);
+    }
+
+    public ProducerFactory<Integer, User> customKafkaProducerFactory(Properties producerProperties) {
         Map<String, Object> props = new HashMap<>();
         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, brokerAddress);
         props.put(ProducerConfig.MAX_BLOCK_MS_CONFIG, maxBlockMS);

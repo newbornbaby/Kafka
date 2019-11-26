@@ -1,14 +1,14 @@
+import conf.CustomSerialize;
 import conf.KafkaConfigure;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
-import org.apache.kafka.clients.producer.Callback;
-import org.apache.kafka.clients.producer.Producer;
-import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.clients.producer.*;
+import org.apache.kafka.common.serialization.IntegerSerializer;
 import org.junit.Test;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.ProducerFactory;
+import pojo.User;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -33,20 +33,23 @@ public class KafkaTest {
      */
     @Test
     public void test() {
-        String topic = "testA";
+        String topic = "testB";
+        Properties properties = new Properties();
+        properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class);
+        properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CustomSerialize.class);
         KafkaConfigure kafkaConfigure = new KafkaConfigure();
-        ConsumerFactory<String, String> consumerFactory =
-                kafkaConfigure.defaultKafkaConsumerFactory(new Properties());
-        Consumer<String, String> consumer = consumerFactory.createConsumer();
+        ConsumerFactory<Integer, User> consumerFactory =
+                kafkaConfigure.customKafkaConsumerFactory(properties);
+        Consumer<Integer, User> consumer = consumerFactory.createConsumer();
         //订阅主题
         consumer.subscribe(Arrays.asList(topic));
         try {
             //拉取消息并消费
             while (isRunning.get()) {
 
-                ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(1000));
+                ConsumerRecords<Integer, User> records = consumer.poll(Duration.ofMillis(1000));
 
-                for (ConsumerRecord<String, String> record : records) {
+                for (ConsumerRecord<Integer, User> record : records) {
 
                     System.out.println("topic=" + record.topic() + ",partition=" + record.partition() + ",offset=" + record.offset());
                     System.out.println("key=" + record.key() + ",value=" + record.value());
@@ -89,6 +92,35 @@ public class KafkaTest {
         while (true) {
             // 异步发送
             producer.send(record, new DemoProducerCallback());
+        }
+    }
+
+    /**
+     * @Description 自定义序列化器
+     * @Author SpiderMao
+     * @CreateDate 2019/11/25 16:32
+     */
+    @Test
+    public void test2() {
+        String topic = "testB";
+        Properties properties = new Properties();
+        properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, IntegerSerializer.class);
+        properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, CustomSerialize.class);
+        KafkaConfigure kafkaConfigure = new KafkaConfigure();
+        ProducerFactory<Integer, User> producerFactory =
+                kafkaConfigure.customKafkaProducerFactory(properties);
+        Producer<Integer, User> producer = producerFactory.createProducer();
+
+        //String time = String.valueOf(System.currentTimeMillis());
+
+        ProducerRecord<Integer, User> record
+                = new ProducerRecord<>(topic, 1, new User(1, "mao11"));
+
+        try {
+            // 同步发送消息
+            producer.send(record).get();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
